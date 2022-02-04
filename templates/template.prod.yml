@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: <Default Project>
+Resources:
+  DefaultApiResource:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+  DefaultFunction:
+    DependsOn: ProdDefaultFunctionRole
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main
+      CodeUri: ./dist/main
+      Runtime: go1.x
+      Role: !GetAtt "ProdDefaultFunctionRole.Arn"
+      Environment:
+        Variables:
+          env: prod
+      Events:
+        Default:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+            RestApiId: !Ref DefaultApiResource
+  ProdDefaultFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: "DriveThruDefaultPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "logs:*"
+                Effect: "Allow"
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*:*:*"
+  BasePathMapping:
+    Type: "AWS::ApiGateway::BasePathMapping"
+    DependsOn: DefaultApiResource
+    Properties:
+      BasePath: "Default"
+      DomainName: ""
+      RestApiId: !Ref DefaultApiResource
+      Stage: !Ref DefaultApiResource.Stage
+  DefaultApiResourceUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    Properties:
+      ApiStages:
+        - ApiId: !Ref DefaultApiResource
+          Stage: !Ref DefaultApiResource.Stage
+      Description: DefaultApiResourceUsagePlan
+      Quota:
+        Limit: 100000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: DefaultApiResourceUsagePlan

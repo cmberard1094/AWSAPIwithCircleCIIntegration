@@ -1,0 +1,55 @@
+version: 2.1
+
+jobs:
+  check:
+    docker:
+      - image: circleci/golang:1.16
+    working_directory: /go/src/default
+    steps:
+      - checkout
+      - run: cp env/.dev.env .env
+      - run: make lint
+      - run: make test
+  deploy:
+    parameters:
+      env:
+        type: string
+        default: "dev"
+    docker:
+      - image: circleci/golang:1.16
+    working_directory: /go/src/default
+    steps:
+      - checkout
+      - run: echo "deploying << parameters.env >>"
+      - run: cp env/.<< parameters.env >>.env .env
+      - run: make preinstall
+      - run: make install
+      - run: make build
+      - run: make package
+      - run: make deploy
+
+workflows:
+  build_and_deploy_dev:
+    jobs:
+      - deploy:
+          env: dev
+          filters:
+            branches:
+              only:
+                - staging
+  build_and_deploy_prod:
+    jobs:
+      - deploy:
+          env: prod
+          filters:
+            branches:
+              only:
+                - production
+  checks:
+    jobs:
+      - check:
+          filters:
+            branches:
+              ignore:
+                - staging
+                - production

@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: <Enter a Description>
+Resources:
+  DevDefaultApiResource:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+  DevDefaultFunction:
+    DependsOn: DevDefaultFunctionRole
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !GetAtt "DevDefaultFunctionRole.Arn"
+      Handler: main
+      CodeUri: ./dist/main
+      Runtime: go1.x
+      Environment:
+        Variables:
+          env: dev
+      Events:
+        PostDefault:
+          Type: Api
+          Properties:
+            Path: /
+            Method: POST
+            RestApiId: !Ref DevDefaultApiResource
+  DevDefaultFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action:
+              - "sts:AssumeRole"
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+      Policies:
+        - PolicyName: "DevDriveThruDefaultPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Action:
+                  - "logs:*"
+                Effect: "Allow"
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*:*:*"
+  BasePathMapping:
+    Type: "AWS::ApiGateway::BasePathMapping"
+    DependsOn: DevDefaultApiResource
+    Properties:
+      BasePath: "Default"
+      DomainName: ""
+      RestApiId: !Ref DevDefaultApiResource
+      Stage: !Ref DevDefaultApiResource.Stage
+  DevDefaultApiResourceUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    Properties:
+      ApiStages:
+        - ApiId: !Ref DevDefaultApiResource
+          Stage: !Ref DevDefaultApiResource.Stage
+      Description: DevDefaultApiResourceUsagePlan
+      Quota:
+        Limit: 2000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: DevDefaultApiResourceUsagePlan
